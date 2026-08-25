@@ -1,12 +1,34 @@
 import type { TrialRunSummary } from '../types';
 
+// A run stuck in 'running' or 'representatives_complete' isn't necessarily
+// still active — it never gets a further status update if every call
+// failed (nothing succeeds to trigger the next update) or if the browser
+// was closed/reloaded mid-phase. Past this age, treat it as abandoned
+// rather than claim it's still "in progress" when nothing will ever
+// resume it.
+const STALL_THRESHOLD_MS = 2 * 60 * 1000;
+
 function describeRun(run: TrialRunSummary): { label: string; tone: 'progress' | 'success' | 'failure' } {
-  if (run.status === 'running') return { label: 'In progress…', tone: 'progress' };
-  if (run.status === 'representatives_complete') return { label: 'Judges pending…', tone: 'progress' };
-  // status === 'completed' from here — but "completed" only means the run
-  // reached the end, not that every call inside it succeeded.
-  if (run.hadFailures) return { label: 'Completed — some calls failed', tone: 'failure' };
-  return { label: 'Completed', tone: 'success' };
+  if (run.status === 'completed') {
+    // "completed" only means the run reached the end, not that every call
+    // inside it succeeded.
+    return run.hadFailures ? { label: 'Completed — some calls failed', tone: 'failure' } : { label: 'Completed', tone: 'success' };
+  }
+
+  // Not completed. If we already know a call in it failed, it's not "in
+  // progress" — that call isn't retrying itself, this run is done for.
+  if (run.hadFailures) {
+    return { label: 'Stalled — some calls failed', tone: 'failure' };
+  }
+
+  const elapsedMs = Date.now() - new Date(run.started_at).getTime();
+  if (elapsedMs > STALL_THRESHOLD_MS) {
+    return run.status === 'running'
+      ? { label: 'Interrupted before any calls finished', tone: 'failure' }
+      : { label: 'Interrupted — judges never ran', tone: 'failure' };
+  }
+
+  return run.status === 'running' ? { label: 'In progress…', tone: 'progress' } : { label: 'Judges pending…', tone: 'progress' };
 }
 
 export function RunHistory({
