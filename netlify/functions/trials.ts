@@ -38,7 +38,25 @@ export const handler: Handler = async (event) => {
       return { statusCode: 500, body: JSON.stringify({ error: `Failed to list trial runs: ${error.message}` }) };
     }
 
-    return { statusCode: 200, body: JSON.stringify({ runs: data }) };
+    // `status` alone only tracks how far a run got (running / representatives
+    // complete / completed) — it does NOT mean every call inside it
+    // succeeded. Separately flag whether any call in each run actually
+    // failed, so a run that reached "completed" while several agents hit
+    // errors doesn't read as a clean success in the history list.
+    const runIds = (data ?? []).map((r) => r.id);
+    let failedRunIds = new Set<string>();
+    if (runIds.length > 0) {
+      const { data: failureLogs } = await supabase
+        .from('api_call_logs')
+        .select('trial_run_id')
+        .eq('status', 'failure')
+        .in('trial_run_id', runIds);
+      failedRunIds = new Set((failureLogs ?? []).map((f) => f.trial_run_id));
+    }
+
+    const runs = (data ?? []).map((r) => ({ ...r, hadFailures: failedRunIds.has(r.id) }));
+
+    return { statusCode: 200, body: JSON.stringify({ runs }) };
   }
 
   return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };

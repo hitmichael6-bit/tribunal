@@ -46,7 +46,11 @@ export interface ChargeSheet {
 export interface TrialRunSummary {
   id: string;
   started_at: string;
-  status: string;
+  // How far the run got — not whether it succeeded (see hadFailures).
+  status: 'running' | 'representatives_complete' | 'completed';
+  // Whether any call in this run actually failed, independent of `status`
+  // (a run can reach "completed" while several of its 7 calls errored).
+  hadFailures: boolean;
 }
 
 export interface TrialRunDetail {
