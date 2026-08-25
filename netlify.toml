@@ -1,0 +1,30 @@
+[build]
+  base = "."
+  publish = "frontend/dist"
+  command = "npm run build"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Order matters: most specific paths first.
+
+[[redirects]]
+  from = "/api/trials/:id/representatives/:role"
+  to = "/.netlify/functions/representative?id=:id&role=:role"
+  status = 200
+
+[[redirects]]
+  from = "/api/trials/:id/judges/:role"
+  to = "/.netlify/functions/judge?id=:id&role=:role"
+  status = 200
+
+[[redirects]]
+  from = "/api/trials/:id"
+  to = "/.netlify/functions/trial?id=:id"
+  status = 200
+
+[[redirects]]
+  from = "/api/trials"
+  to = "/.netlify/functions/trials"
+  status = 200

@@ -1,0 +1,20 @@
+{
+  "name": "tribunal-t-001",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Backend (Netlify Functions) for Case T-001: The Realm v. Jon Snow tribunal.",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^2.8.1",
+    "@types/node": "^20.14.10",
+    "netlify-cli": "^27.3.0",
+    "typescript": "^5.5.4"
+  }
+}
