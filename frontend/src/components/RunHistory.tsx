@@ -55,10 +55,10 @@ export function RunHistory({
               onClick={() => onSelect(run.id)}
             >
               <span>
-                {new Date(run.started_at).toLocaleString([], {
+                {new Date(run.started_at).toLocaleString('en-GB', {
                   year: 'numeric',
-                  month: 'numeric',
-                  day: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
                   hour: '2-digit',
                   minute: '2-digit',
                   second: '2-digit',
