@@ -8,20 +8,26 @@
   node_bundler = "esbuild"
 
 # Order matters: most specific paths first.
+#
+# :id/:role are forwarded as path segments, not query string params —
+# path-segment placeholder forwarding is Netlify's documented, confirmed
+# pattern; forwarding into a query string via a rewrite (status 200) isn't.
+# The functions themselves (lib/extractParams.ts) read from either shape,
+# so this is a belt-and-suspenders fix, not a single point of failure.
 
 [[redirects]]
   from = "/api/trials/:id/representatives/:role"
-  to = "/.netlify/functions/representative?id=:id&role=:role"
+  to = "/.netlify/functions/representative/:id/:role"
   status = 200
 
 [[redirects]]
   from = "/api/trials/:id/judges/:role"
-  to = "/.netlify/functions/judge?id=:id&role=:role"
+  to = "/.netlify/functions/judge/:id/:role"
   status = 200
 
 [[redirects]]
   from = "/api/trials/:id"
-  to = "/.netlify/functions/trial?id=:id"
+  to = "/.netlify/functions/trial/:id"
   status = 200
 
 [[redirects]]

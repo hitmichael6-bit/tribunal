@@ -2,6 +2,7 @@ import type { Handler } from '@netlify/functions';
 import { supabase } from './lib/supabase';
 import { CHARGE_SHEET } from './lib/chargeSheet';
 import { safeHandler } from './lib/safeHandler';
+import { extractTrialId } from './lib/extractParams';
 
 // GET /api/trials/:id — full detail of one run, for reloading a past run
 // read-only. Representatives and judges are returned as separate arrays;
@@ -11,7 +12,7 @@ export const handler: Handler = safeHandler(async (event) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  const trialId = event.queryStringParameters?.id;
+  const trialId = extractTrialId(event);
   if (!trialId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing trial id' }) };
   }

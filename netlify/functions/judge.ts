@@ -7,6 +7,7 @@ import { JUDGES, REPRESENTATIVES } from './lib/prompts';
 import { buildJudgeUserPrompt } from './lib/prompts/shared';
 import { parseJudgeResponse } from './lib/parseJudgeResponse';
 import { safeHandler } from './lib/safeHandler';
+import { extractTrialId, extractRole } from './lib/extractParams';
 import type { JudgeResult, RepresentativeResult } from './lib/types';
 
 // POST /api/trials/:id/judges/:role
@@ -19,8 +20,8 @@ export const handler: Handler = safeHandler(async (event) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  const trialId = event.queryStringParameters?.id;
-  const role = event.queryStringParameters?.role;
+  const trialId = extractTrialId(event);
+  const role = extractRole(event);
   if (!trialId || !role) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing trial id or role' }) };
   }

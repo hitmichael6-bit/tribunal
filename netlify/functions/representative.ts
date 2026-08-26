@@ -6,6 +6,7 @@ import { getCost } from './lib/pricing';
 import { REPRESENTATIVES } from './lib/prompts';
 import { buildRepresentativeUserPrompt } from './lib/prompts/shared';
 import { safeHandler } from './lib/safeHandler';
+import { extractTrialId, extractRole } from './lib/extractParams';
 import type { RepresentativeResult } from './lib/types';
 
 // POST /api/trials/:id/representatives/:role
@@ -21,8 +22,8 @@ export const handler: Handler = safeHandler(async (event) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  const trialId = event.queryStringParameters?.id;
-  const role = event.queryStringParameters?.role;
+  const trialId = extractTrialId(event);
+  const role = extractRole(event);
   if (!trialId || !role) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing trial id or role' }) };
   }
