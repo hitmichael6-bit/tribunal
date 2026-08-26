@@ -6,6 +6,7 @@ import { getCost } from './lib/pricing';
 import { JUDGES, REPRESENTATIVES } from './lib/prompts';
 import { buildJudgeUserPrompt } from './lib/prompts/shared';
 import { parseJudgeResponse } from './lib/parseJudgeResponse';
+import { safeHandler } from './lib/safeHandler';
 import type { JudgeResult, RepresentativeResult } from './lib/types';
 
 // POST /api/trials/:id/judges/:role
@@ -13,7 +14,7 @@ import type { JudgeResult, RepresentativeResult } from './lib/types';
 // one-call-per-invocation reasoning as representative.ts — see its
 // comment). This function must never look at or reference another judge's
 // output; it never computes or persists anything that combines rulings.
-export const handler: Handler = async (event) => {
+export const handler: Handler = safeHandler(async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -127,4 +128,4 @@ export const handler: Handler = async (event) => {
 
   const success: JudgeResult = { role: judge.role, name: judge.name, status: 'success', verdict: parsed.verdict, reasoningText: parsed.reasoningText };
   return { statusCode: 200, body: JSON.stringify(success) };
-};
+});

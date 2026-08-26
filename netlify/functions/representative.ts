@@ -5,6 +5,7 @@ import { callOpenRouter } from './lib/openrouter';
 import { getCost } from './lib/pricing';
 import { REPRESENTATIVES } from './lib/prompts';
 import { buildRepresentativeUserPrompt } from './lib/prompts/shared';
+import { safeHandler } from './lib/safeHandler';
 import type { RepresentativeResult } from './lib/types';
 
 // POST /api/trials/:id/representatives/:role
@@ -15,7 +16,7 @@ import type { RepresentativeResult } from './lib/types';
 // pushes uncomfortably close to serverless function time limits. One call
 // per invocation keeps each one fast and independent; the backend still
 // owns every OpenRouter call, every log write, and every DB write.
-export const handler: Handler = async (event) => {
+export const handler: Handler = safeHandler(async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -89,4 +90,4 @@ export const handler: Handler = async (event) => {
 
   const success: RepresentativeResult = { role: rep.role, name: rep.name, seat: rep.seat, status: 'success', argumentText: result.content };
   return { statusCode: 200, body: JSON.stringify(success) };
-};
+});
