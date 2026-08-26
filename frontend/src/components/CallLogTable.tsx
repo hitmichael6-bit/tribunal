@@ -63,7 +63,9 @@ export function CallLogTable({ entries }: { entries: CallLogEntry[] }) {
                   <span className={`badge badge--status-${entry.status}`}>{entry.status}</span>
                   {entry.error_message && <div className="call-log__error">{entry.error_message}</div>}
                 </td>
-                <td>{new Date(entry.timestamp).toLocaleTimeString()}</td>
+                <td className="call-log__time">
+                  {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+                </td>
               </tr>
             ))}
           </tbody>

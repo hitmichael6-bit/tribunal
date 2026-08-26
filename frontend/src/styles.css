@@ -455,22 +455,22 @@ table {
 }
 
 col.col-agent {
-  width: 16%;
+  width: 15%;
 }
 col.col-model {
-  width: 30%;
+  width: 27%;
 }
 col.col-tokens {
-  width: 16%;
+  width: 15%;
 }
 col.col-cost {
-  width: 10%;
+  width: 9%;
 }
 col.col-status {
-  width: 20%;
+  width: 22%;
 }
 col.col-time {
-  width: 8%;
+  width: 12%;
 }
 
 th,
@@ -528,6 +528,11 @@ tfoot td {
   color: var(--text-dim);
   font-size: 0.72rem;
   margin-top: 0.1rem;
+}
+
+.call-log__time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .call-log__error {
