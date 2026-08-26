@@ -54,7 +54,17 @@ export function RunHistory({
               className={run.id === activeId ? 'run-history__item run-history__item--active' : 'run-history__item'}
               onClick={() => onSelect(run.id)}
             >
-              <span>{new Date(run.started_at).toLocaleString()}</span>
+              <span>
+                {new Date(run.started_at).toLocaleString([], {
+                  year: 'numeric',
+                  month: 'numeric',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: false,
+                })}
+              </span>
               <span className={`badge badge--status-${tone}`}>{label}</span>
             </button>
           </li>
