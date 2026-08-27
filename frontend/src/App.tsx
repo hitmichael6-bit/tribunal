@@ -5,10 +5,21 @@ import { RepresentativeCard } from './components/RepresentativeCard';
 import { JudgeCard } from './components/JudgeCard';
 import { CallLogTable } from './components/CallLogTable';
 import { RunHistory } from './components/RunHistory';
-import { JUDGE_ROLES, REPRESENTATIVE_ROLES, createTrial, getTrial, listTrials, runJudge, runRepresentative } from './api';
+import { JUDGES, JUDGE_ROLES, REPRESENTATIVES, REPRESENTATIVE_ROLES, createTrial, getTrial, listTrials, runJudge, runRepresentative } from './api';
 import type { CallLogEntry, JudgeResult, RepresentativeResult, TrialRunSummary } from './types';
 
 type Phase = 'idle' | 'representatives' | 'judges' | 'done' | 'error';
+
+// Replace the entry for a role if present, otherwise append. Used so both
+// the live call results and the post-phase reconciliation against the DB
+// write into the same slot instead of duplicating a card.
+function upsertByRole<T extends { role: string }>(list: T[], item: T): T[] {
+  const idx = list.findIndex((x) => x.role === item.role);
+  if (idx === -1) return [...list, item];
+  const next = list.slice();
+  next[idx] = item;
+  return next;
+}
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>('idle');
@@ -32,6 +43,41 @@ export default function App() {
     refreshHistory();
   }, []);
 
+  // Pull the run's persisted state and let it override what the live calls
+  // produced. A slow representative or judge call can commit its result to
+  // the DB and still have its HTTP response lost to the function timeout —
+  // surfacing here as a failed request for a result that actually exists.
+  // The DB is the source of truth; the transport outcome is not.
+  async function reconcileFromDb(id: string) {
+    // Keep whatever the live calls produced if this read fails.
+    const detail = await getTrial(id).catch(() => null);
+    if (!detail) return;
+
+    setRepresentatives((prev) => {
+      let next = prev;
+      for (const { role, name, seat } of REPRESENTATIVES) {
+        const row = detail.representatives.find((r) => r.representative_role === role);
+        if (row) {
+          next = upsertByRole(next, { role, name, seat, status: 'success', argumentText: row.argument_text });
+        }
+      }
+      return next;
+    });
+
+    setJudges((prev) => {
+      let next = prev;
+      for (const { role, name } of JUDGES) {
+        const row = detail.judges.find((j) => j.judge_role === role);
+        if (row) {
+          next = upsertByRole(next, { role, name, status: 'success', verdict: row.verdict, reasoningText: row.reasoning_text });
+        }
+      }
+      return next;
+    });
+
+    setCallLog(detail.callLog);
+  }
+
   async function handleRunTrial() {
     setViewingPastId(null);
     setErrorMessage(null);
@@ -40,40 +86,55 @@ export default function App() {
     setCallLog([]);
     setPhase('representatives');
 
-    try {
-      const created = await createTrial();
-      setTrialId(created.id);
-
-      // Fire all 4 representative calls in parallel, as separate backend
-      // requests — each card flips from loading to its result as soon as
-      // its own call resolves, independent of the others.
-      await Promise.all(
-        REPRESENTATIVE_ROLES.map(async (role) => {
-          const result = await runRepresentative(created.id, role);
-          setRepresentatives((prev) => [...prev, result]);
-        })
-      );
-
-      setPhase('judges');
-      // Same pattern for the 3 judges — fired independently, each rendered
-      // the moment its own ruling comes back. Never awaited/combined into a
-      // single verdict.
-      await Promise.all(
-        JUDGE_ROLES.map(async (role) => {
-          const result = await runJudge(created.id, role);
-          setJudges((prev) => [...prev, result]);
-        })
-      );
-
-      setPhase('done');
-      refreshHistory();
-
-      const detail = await getTrial(created.id);
-      setCallLog(detail.callLog);
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Something went wrong running the trial.');
+    const created = await createTrial().catch((err: any) => {
+      setErrorMessage(err?.message || 'Could not start a new trial.');
       setPhase('error');
-    }
+      return null;
+    });
+    if (!created) return;
+    setTrialId(created.id);
+    const id = created.id;
+
+    // Phase 1 — the 4 representatives, each its own backend request, fired
+    // in parallel. allSettled (not all): one call failing, or its response
+    // being lost to a slow-call timeout, must not stop the others or the
+    // judges. A call that never returns a body still gets a labelled
+    // failure card from the mirrored name/seat.
+    await Promise.allSettled(
+      REPRESENTATIVES.map(async ({ role, name, seat }) => {
+        try {
+          const result = await runRepresentative(id, role);
+          setRepresentatives((prev) => upsertByRole(prev, result));
+        } catch (err: any) {
+          setRepresentatives((prev) =>
+            upsertByRole<RepresentativeResult>(prev, { role, name, seat, status: 'failure', error: err?.message || 'Request failed.' }),
+          );
+        }
+      }),
+    );
+    await reconcileFromDb(id);
+
+    // Phase 2 — the 3 judges. Same discipline. Each judge reads whatever
+    // representative opinions persisted (missing ones are passed to it as an
+    // explicit "no submission on record"), rules alone, and is rendered on
+    // its own. Nothing here combines the three.
+    setPhase('judges');
+    await Promise.allSettled(
+      JUDGES.map(async ({ role, name }) => {
+        try {
+          const result = await runJudge(id, role);
+          setJudges((prev) => upsertByRole(prev, result));
+        } catch (err: any) {
+          setJudges((prev) =>
+            upsertByRole<JudgeResult>(prev, { role, name, status: 'failure', error: err?.message || 'Request failed.' }),
+          );
+        }
+      }),
+    );
+    await reconcileFromDb(id);
+
+    setPhase('done');
+    refreshHistory();
   }
 
   async function handleSelectPastRun(id: string) {
