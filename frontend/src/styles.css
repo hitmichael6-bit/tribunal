@@ -464,10 +464,10 @@ col.col-tokens {
   width: 15%;
 }
 col.col-cost {
-  width: 9%;
+  width: 13%;
 }
 col.col-status {
-  width: 22%;
+  width: 18%;
 }
 col.col-time {
   width: 12%;
@@ -531,6 +531,13 @@ tfoot td {
 }
 
 .call-log__time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cost is a single number — never let it break mid-value. tabular-nums keeps
+   the column of $ amounts vertically aligned, matching the time column. */
+.call-log__cost {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }

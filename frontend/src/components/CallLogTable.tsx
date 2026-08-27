@@ -58,7 +58,7 @@ export function CallLogTable({ entries }: { entries: CallLogEntry[] }) {
                     '—'
                   )}
                 </td>
-                <td>{formatCost(entry.cost)}</td>
+                <td className="call-log__cost">{formatCost(entry.cost)}</td>
                 <td>
                   <span className={`badge badge--status-${entry.status}`}>{entry.status}</span>
                   {entry.error_message && <div className="call-log__error">{entry.error_message}</div>}
@@ -73,7 +73,7 @@ export function CallLogTable({ entries }: { entries: CallLogEntry[] }) {
             <tr>
               <td colSpan={2}>Total</td>
               <td>{totalTokens.toLocaleString()}</td>
-              <td>{formatCost(totalCost)}</td>
+              <td className="call-log__cost">{formatCost(totalCost)}</td>
               <td colSpan={2} />
             </tr>
           </tfoot>
