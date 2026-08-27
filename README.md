@@ -49,6 +49,8 @@ Every call logs `agent_role, model_used, prompt_tokens, completion_tokens, total
 
 A failed OpenRouter call (after retries) is logged with `status='failure'` and an error message, and that agent's card renders as a visible failure in the UI — the app never fabricates a missing argument or ruling. If a representative's call fails, the judges are told explicitly that no submission is available from that representative, rather than the failure being silently papered over.
 
+Each call also has an overall time budget (`OPENROUTER_TIMEOUT_MS`, default 25s) covering every retry attempt and the response body download — the point where a slow model actually stalls, since headers return fast and the generated text then trickles in. The budget sits below the serverless function timeout (30s locally; Netlify's synchronous-function ceiling in production), so a model that is slow or hung produces the same clean, logged failure card as any other failure instead of the function being killed mid-request and surfacing as an opaque 502. Lower the budget for a fast model; raise it only if the function timeout is higher.
+
 ## Project layout
 
 ```
