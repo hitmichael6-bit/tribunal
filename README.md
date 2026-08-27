@@ -51,6 +51,12 @@ A failed OpenRouter call (after retries) is logged with `status='failure'` and a
 
 Each call also has an overall time budget (`OPENROUTER_TIMEOUT_MS`, default 25s) covering every retry attempt and the response body download — the point where a slow model actually stalls, since headers return fast and the generated text then trickles in. The budget sits below the serverless function timeout (30s locally; Netlify's synchronous-function ceiling in production), so a model that is slow or hung produces the same clean, logged failure card as any other failure instead of the function being killed mid-request and surfacing as an opaque 502. Lower the budget for a fast model; raise it only if the function timeout is higher.
 
+## API access gate (optional)
+
+The 4 function endpoints can require a shared secret. Set `VITE_TRIBUNAL_ACCESS_KEY` (build + function env) to a long random string: the frontend then sends it as an `X-Tribunal-Key` header on every call and the functions 401 anything without it, before any model call or DB access. Left unset (the default, and how local dev runs) the gate is a no-op.
+
+This is not real access control — the value ships in the frontend bundle, so it can't be marked "secret" in Netlify and anyone inspecting the page can read it. It exists to make blind bots hitting the function URLs bounce off a 401 instead of consuming OpenRouter budget. The hard spend ceiling is the credit limit set on the OpenRouter key itself; setting the site to private on the host is stronger still.
+
 ## Project layout
 
 ```

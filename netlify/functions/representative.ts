@@ -6,6 +6,7 @@ import { getCost } from './lib/pricing';
 import { REPRESENTATIVES } from './lib/prompts';
 import { buildRepresentativeUserPrompt } from './lib/prompts/shared';
 import { safeHandler } from './lib/safeHandler';
+import { checkAccess } from './lib/checkAccess';
 import { extractTrialId, extractRole } from './lib/extractParams';
 import type { RepresentativeResult } from './lib/types';
 
@@ -18,6 +19,9 @@ import type { RepresentativeResult } from './lib/types';
 // per invocation keeps each one fast and independent; the backend still
 // owns every OpenRouter call, every log write, and every DB write.
 export const handler: Handler = safeHandler(async (event) => {
+  const denied = checkAccess(event);
+  if (denied) return denied;
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }

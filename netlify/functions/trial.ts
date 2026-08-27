@@ -2,12 +2,16 @@ import type { Handler } from '@netlify/functions';
 import { supabase } from './lib/supabase';
 import { CHARGE_SHEET } from './lib/chargeSheet';
 import { safeHandler } from './lib/safeHandler';
+import { checkAccess } from './lib/checkAccess';
 import { extractTrialId } from './lib/extractParams';
 
 // GET /api/trials/:id — full detail of one run, for reloading a past run
 // read-only. Representatives and judges are returned as separate arrays;
 // this endpoint does not compute or expose any combined verdict.
 export const handler: Handler = safeHandler(async (event) => {
+  const denied = checkAccess(event);
+  if (denied) return denied;
+
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }

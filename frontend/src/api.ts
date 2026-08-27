@@ -1,8 +1,39 @@
 import type { ChargeSheet, JudgeResult, RepresentativeResult, Seat, TrialRunDetail, TrialRunSummary } from './types';
 
+// Error thrown by request() for any non-2xx response; carries the HTTP
+// status so callers can special-case (e.g. treat 401 differently from a
+// transient 500).
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// Optional shared-secret sent with every API call. Set at build time via
+// VITE_TRIBUNAL_ACCESS_KEY; the functions check for the matching header and
+// 401 without it. Unset (local dev, or if you don't use the gate) means no
+// header is sent and the functions don't require one — behaviour unchanged.
+const ACCESS_KEY = import.meta.env.VITE_TRIBUNAL_ACCESS_KEY;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
+  const headers = new Headers(init?.headers);
+  if (ACCESS_KEY) headers.set('X-Tribunal-Key', ACCESS_KEY);
+  const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
+    // 401 means the API access gate is on and this request didn't satisfy
+    // it. A correctly configured deployment never shows this to a browser
+    // user (the frontend always sends the header) — it means the build and
+    // the functions disagree on VITE_TRIBUNAL_ACCESS_KEY, or it's set on one
+    // side only. Say so plainly instead of a bare "Unauthorized".
+    if (response.status === 401) {
+      throw new ApiError(
+        ACCESS_KEY
+          ? 'Access denied (401). This deployment’s access key doesn’t match the one the server expects — make VITE_TRIBUNAL_ACCESS_KEY identical in the build and function environments, then redeploy.'
+          : 'Access denied (401). This deployment requires an access key but the frontend was built without one — set VITE_TRIBUNAL_ACCESS_KEY in the site environment and redeploy.',
+        401,
+      );
+    }
     let message = `Request to ${path} failed with ${response.status}`;
     try {
       const body = await response.json();
@@ -10,7 +41,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // ignore — use default message
     }
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
   return response.json();
 }

@@ -5,7 +5,7 @@ import { RepresentativeCard } from './components/RepresentativeCard';
 import { JudgeCard } from './components/JudgeCard';
 import { CallLogTable } from './components/CallLogTable';
 import { RunHistory } from './components/RunHistory';
-import { JUDGES, JUDGE_ROLES, REPRESENTATIVES, REPRESENTATIVE_ROLES, createTrial, getTrial, listTrials, runJudge, runRepresentative } from './api';
+import { ApiError, JUDGES, JUDGE_ROLES, REPRESENTATIVES, REPRESENTATIVE_ROLES, createTrial, getTrial, listTrials, runJudge, runRepresentative } from './api';
 import type { CallLogEntry, JudgeResult, RepresentativeResult, TrialRunSummary } from './types';
 
 type Phase = 'idle' | 'representatives' | 'judges' | 'done' | 'error';
@@ -34,8 +34,14 @@ export default function App() {
   function refreshHistory() {
     listTrials()
       .then((res) => setHistory(res.runs))
-      .catch(() => {
-        /* history list is a nice-to-have; failing silently here is fine, it just stays empty */
+      .catch((err: unknown) => {
+        // The history list is a nice-to-have — stay silent on transient
+        // errors, it just stays empty. But a 401 means the whole API is
+        // gated off from this build; surface that on load rather than
+        // letting the app look merely empty until the user clicks Run.
+        if (err instanceof ApiError && err.status === 401) {
+          setErrorMessage(err.message);
+        }
       });
   }
 

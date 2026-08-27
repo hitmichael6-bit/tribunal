@@ -2,10 +2,14 @@ import type { Handler } from '@netlify/functions';
 import { supabase } from './lib/supabase';
 import { CHARGE_SHEET } from './lib/chargeSheet';
 import { safeHandler } from './lib/safeHandler';
+import { checkAccess } from './lib/checkAccess';
 
 // POST /api/trials  -> create a new trial run, return its id + the fixed charge sheet.
 // GET  /api/trials  -> list past runs (id, startedAt, status), newest first.
 export const handler: Handler = safeHandler(async (event) => {
+  const denied = checkAccess(event);
+  if (denied) return denied;
+
   if (event.httpMethod === 'POST') {
     const { data, error } = await supabase
       .from('trial_runs')

@@ -7,6 +7,7 @@ import { JUDGES, REPRESENTATIVES } from './lib/prompts';
 import { buildJudgeUserPrompt } from './lib/prompts/shared';
 import { parseJudgeResponse } from './lib/parseJudgeResponse';
 import { safeHandler } from './lib/safeHandler';
+import { checkAccess } from './lib/checkAccess';
 import { extractTrialId, extractRole } from './lib/extractParams';
 import type { JudgeResult, RepresentativeResult } from './lib/types';
 
@@ -16,6 +17,9 @@ import type { JudgeResult, RepresentativeResult } from './lib/types';
 // comment). This function must never look at or reference another judge's
 // output; it never computes or persists anything that combines rulings.
 export const handler: Handler = safeHandler(async (event) => {
+  const denied = checkAccess(event);
+  if (denied) return denied;
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
