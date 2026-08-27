@@ -60,6 +60,14 @@ export const handler: Handler = safeHandler(async (event) => {
   const result = await callOpenRouter({ model, systemPrompt: judge.systemPrompt, userPrompt, maxTokens: 1600 });
   const timestamp = new Date().toISOString();
 
+  // Reaching the judges phase at all means the pipeline ran to the end.
+  // 'completed' records how far the run got, not that every call in it
+  // succeeded (that's the hadFailures flag, derived from api_call_logs) —
+  // so a judge that fails still finalizes the run rather than leaving it
+  // stuck at 'representatives_complete' as if the judges never ran.
+  // Best-effort and idempotent — harmless if all 3 invocations race to set it.
+  const markRunReachedEnd = () => supabase.from('trial_runs').update({ status: 'completed' }).eq('id', trialId);
+
   if (result.status === 'failure' || !result.content || !result.usage) {
     await supabase.from('api_call_logs').insert({
       trial_run_id: trialId,
@@ -73,6 +81,7 @@ export const handler: Handler = safeHandler(async (event) => {
       error_message: result.errorMessage || 'Unknown failure',
       timestamp,
     });
+    await markRunReachedEnd();
     const failed: JudgeResult = { role: judge.role, name: judge.name, status: 'failure', error: result.errorMessage };
     return { statusCode: 200, body: JSON.stringify(failed) };
   }
@@ -93,6 +102,7 @@ export const handler: Handler = safeHandler(async (event) => {
       error_message: 'Model response did not contain a parseable VERDICT line.',
       timestamp,
     });
+    await markRunReachedEnd();
     const failed: JudgeResult = { role: judge.role, name: judge.name, status: 'failure', error: "Could not parse a verdict from this judge's response." };
     return { statusCode: 200, body: JSON.stringify(failed) };
   }
@@ -120,12 +130,12 @@ export const handler: Handler = safeHandler(async (event) => {
   });
 
   if (insertRulingError) {
+    await markRunReachedEnd();
     const failed: JudgeResult = { role: judge.role, name: judge.name, status: 'failure', error: insertRulingError.message };
     return { statusCode: 200, body: JSON.stringify(failed) };
   }
 
-  // Best-effort, idempotent — harmless if all 3 calls race to set this.
-  await supabase.from('trial_runs').update({ status: 'completed' }).eq('id', trialId);
+  await markRunReachedEnd();
 
   const success: JudgeResult = { role: judge.role, name: judge.name, status: 'success', verdict: parsed.verdict, reasoningText: parsed.reasoningText };
   return { statusCode: 200, body: JSON.stringify(success) };

@@ -9,6 +9,11 @@
 
 const MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+// This fetch is on the critical path of every agent endpoint (cost is
+// computed before the call is logged and the response returned), so it gets
+// a tight deadline of its own. If OpenRouter is slow, cost logs as null
+// rather than pushing the whole handler toward the function timeout.
+const PRICING_FETCH_TIMEOUT_MS = 4000;
 
 interface PricingEntry {
   promptPrice: number; // $ per token
@@ -22,30 +27,37 @@ async function loadPricingTable(): Promise<Map<string, PricingEntry>> {
     return cache.byModelId;
   }
 
-  const byModelId = new Map<string, PricingEntry>();
+  let fetched: Map<string, PricingEntry> | null = null;
   try {
-    const response = await fetch(MODELS_URL);
+    const response = await fetch(MODELS_URL, { signal: AbortSignal.timeout(PRICING_FETCH_TIMEOUT_MS) });
     if (response.ok) {
       const data: any = await response.json();
+      const parsed = new Map<string, PricingEntry>();
       for (const model of data?.data ?? []) {
         const promptPrice = parseFloat(model?.pricing?.prompt ?? '0');
         const completionPrice = parseFloat(model?.pricing?.completion ?? '0');
         if (model?.id) {
-          byModelId.set(model.id, {
+          parsed.set(model.id, {
             promptPrice: Number.isFinite(promptPrice) ? promptPrice : 0,
             completionPrice: Number.isFinite(completionPrice) ? completionPrice : 0,
           });
         }
       }
+      if (parsed.size > 0) fetched = parsed;
     }
   } catch {
-    // Fall through with whatever (possibly empty) table we have; cost lookup
-    // failure is non-fatal — it never blocks logging the call's real
-    // token counts and status.
+    // Network error or the timeout above — non-fatal. Cost lookup failure
+    // never blocks logging the call's real token counts and status.
   }
 
-  cache = { fetchedAt: Date.now(), byModelId };
-  return byModelId;
+  if (fetched) {
+    cache = { fetchedAt: Date.now(), byModelId: fetched };
+    return fetched;
+  }
+  // Fetch failed: reuse a stale table if we have one, otherwise an empty
+  // table for this call only — don't cache the failure and lock cost
+  // lookups to null for the next hour.
+  return cache?.byModelId ?? new Map();
 }
 
 export async function getCost(modelId: string, promptTokens: number, completionTokens: number): Promise<number | null> {
